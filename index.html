@@ -106,30 +106,32 @@ body{background:radial-gradient(1300px 780px at 72% -12%,#eef4fb 0%,var(--bg) 58
   background:linear-gradient(90deg,#2f5fa8,#237a55,#c9a24a,#6f4a9e);opacity:.9}
 #v-pick .pkWrap{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;padding:2rem 2rem 0}
 #v-pick .brand{font-size:.84rem;letter-spacing:.52em;color:#b08c3e;font-weight:700;margin-top:.5rem;text-indent:.52em}
-#v-pick .clogo{height:6.6rem;width:auto;display:block;margin-bottom:0;
+#v-pick .clogo{height:7rem;width:auto;display:block;margin-bottom:0;
   filter:drop-shadow(0 16px 32px rgba(138,44,30,.26)) drop-shadow(0 3px 8px rgba(138,44,30,.14))}
-#v-pick h1{font-size:4.6rem;letter-spacing:.2em;font-family:"Songti SC","Noto Serif CJK SC","SimSun",serif;
+#v-pick h1{font-size:4.9rem;letter-spacing:.2em;font-family:"Songti SC","Noto Serif CJK SC","SimSun",serif;
   color:#12233b;margin-top:1.15rem;line-height:1.12;font-weight:800;text-align:center;text-indent:.2em}
 #v-pick h1 .dot{color:#b8433a;margin:0 .22em}
 #v-pick .rule{display:flex;align-items:center;gap:1.2rem;margin-top:1.5rem}
 #v-pick .rule i{display:block;width:5.6rem;height:1px;background:linear-gradient(90deg,transparent,#d3ab63)}
 #v-pick .rule i:last-child{background:linear-gradient(90deg,#d3ab63,transparent)}
-#v-pick .rule b{font-size:1.4rem;letter-spacing:.14em;color:#97742c;font-weight:700;white-space:nowrap;font-family:"Songti SC","Noto Serif CJK SC","SimSun",serif}
-#pickGrid{display:flex;gap:1.7rem;margin-top:3.4rem;flex-wrap:wrap;justify-content:center}
-#pickGrid .pk{width:15rem;padding:2.1rem 1.2rem 1.7rem;text-align:center;border-radius:1.15rem;cursor:pointer;position:relative;
+#v-pick .rule b{font-size:1.48rem;letter-spacing:.14em;color:#97742c;font-weight:700;white-space:nowrap;font-family:"Songti SC","Noto Serif CJK SC","SimSun",serif}
+#pickGrid{display:flex;gap:clamp(1rem,1.5vw,1.9rem);margin-top:3rem;flex-wrap:wrap;justify-content:center;
+  width:min(93vw,88rem)}
+#pickGrid .pk{flex:1 1 0;min-width:14rem;max-width:21rem;padding:2.7rem 1.5rem 2.2rem;text-align:center;
+  border-radius:1.35rem;cursor:pointer;position:relative;
   background:linear-gradient(180deg,#ffffff,#fdfdfc);border:1px solid #e6e9ef;
-  box-shadow:0 1px 2px rgba(18,34,56,.05),0 16px 34px -16px rgba(18,34,56,.22);
+  box-shadow:0 1px 2px rgba(18,34,56,.05),0 18px 38px -18px rgba(18,34,56,.24);
   transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
 #pickGrid .pk:hover{transform:translateY(-.5rem);border-color:#d9b266;
   box-shadow:0 2px 4px rgba(18,34,56,.05),0 26px 48px -18px rgba(120,90,40,.34)}
 #pickGrid .pk:before{content:"";position:absolute;left:0;right:0;top:0;height:3px;border-radius:1.15rem 1.15rem 0 0;
   background:linear-gradient(90deg,transparent,var(--c) 30%,var(--c) 70%,transparent)}
-#pickGrid .n{display:inline-flex;align-items:center;justify-content:center;width:3rem;height:3rem;border-radius:50%;
-  font-size:1.38rem;font-weight:800;color:#fff;background:var(--c);
+#pickGrid .n{display:inline-flex;align-items:center;justify-content:center;width:3.6rem;height:3.6rem;border-radius:50%;
+  font-size:1.62rem;font-weight:800;color:#fff;background:var(--c);
   box-shadow:0 8px 18px -8px var(--c),inset 0 0 0 2px rgba(255,255,255,.28)}
-#pickGrid .t{font-size:1.58rem;margin-top:.95rem;font-weight:800;color:#12233b;letter-spacing:.06em}
-#pickGrid .r{font-size:.96rem;color:#5d7089;margin-top:.8rem;padding-top:.75rem;border-top:1px solid #eef1f6;line-height:1.5}
-#pickGrid .go{margin-top:1.15rem;font-size:.85rem;font-weight:800;color:var(--c);letter-spacing:.14em;opacity:.85}
+#pickGrid .t{font-size:1.82rem;margin-top:1.1rem;font-weight:800;color:#12233b;letter-spacing:.06em}
+#pickGrid .r{font-size:1.06rem;color:#5d7089;margin-top:1rem;padding-top:.95rem;border-top:1px solid #eef1f6;line-height:1.55}
+#pickGrid .go{margin-top:1.5rem;font-size:.95rem;font-weight:800;color:var(--c);letter-spacing:.14em;opacity:.85}
 #v-pick .sign{position:relative;z-index:1;margin-top:3.2rem;font-size:.8rem;letter-spacing:.28em;color:#8f9fb2}
 
 /* ===== 1号 ===== */
@@ -443,8 +445,9 @@ body{background:radial-gradient(1300px 780px at 72% -12%,#eef4fb 0%,var(--bg) 58
   #v-pick .pkWrap{padding:1rem 1rem 0}
   #v-pick h1{font-size:2.4rem}
   #v-pick .brand{font-size:.72rem;letter-spacing:.3em}
-  #pickGrid{gap:.9rem;margin-top:1.6rem}
-  #pickGrid .pk{width:12rem;padding:1.4rem .8rem 1.1rem}
+  #pickGrid{gap:.9rem;margin-top:1.6rem;max-width:96vw}
+  #pickGrid .pk{flex:0 1 auto;width:13rem;min-width:0;max-width:none;padding:1.5rem .9rem 1.2rem;border-radius:1rem}
+  #pickGrid .n{width:3rem;height:3rem;font-size:1.35rem}
   #pickGrid .t{font-size:1.2rem}
   #pickGrid .r{font-size:.85rem}
   #v-pick .sign{margin-top:1.6rem;font-size:.7rem}
@@ -502,7 +505,6 @@ body{background:radial-gradient(1300px 780px at 72% -12%,#eef4fb 0%,var(--bg) 58
       </div>
     </div>
   </div>
-  <div class="sign">四 机 位 协 同 平 台</div>
 </div>
 
 <!-- ============ 1号 统筹台 ============ -->
