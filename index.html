@@ -718,6 +718,7 @@ const DEF={
   ],
   req:{confirmed:false,status:'',note:'',data:null,code:''},
   sop:{done:false,at:''},
+  rev1:{req:{st:'submitted',note:''},plan2:{st:'submitted',note:''},plan3:{st:'submitted',note:''}},
   plan2:{picks:[],status:'draft',note:'',
     details:{},                       // pid -> {slot, join, loc, en}
     giftList:{},                      // gid -> num（勾选且数量>1）
@@ -733,7 +734,7 @@ let DESK='1';
 let NET={on:false,mode:'local'};   // local | lan | offline
 
 /* ---------- 同步层 ---------- */
-const PARTS={s1:['tasks','sop'],s2:['plan2'],s3:['plan3'],s4:['req','call','voice'],sh:['notices']};
+const PARTS={s1:['tasks','sop','rev1'],s2:['plan2'],s3:['plan3'],s4:['req','call','voice'],sh:['notices']};
 const partOfDesk=d=>'s'+d;
 function loadLocal(){
   try{const raw=localStorage.getItem(LKEY); if(raw){const o=JSON.parse(raw); Object.assign(S,o);} }catch(e){}
@@ -812,6 +813,16 @@ function tickClock(){ const el=$('clk'); if(el)el.textContent=new Date().toTimeS
 setInterval(tickClock,1000);
 
 function renderFoot(){
+  if(DESK==='1'){
+    /* 1号台：底部以本台审核记录为准（不随 2/3/4 号台状态跳动） */
+    $('fPeople').textContent='18人';
+    $('fArrive').textContent='周六14:30 泉州站';
+    $('fDiet').textContent='花生/牛肉';
+    $('fReq').textContent=stTxt(rev1('req').st);
+    $('f2').textContent=stTxt(rev1('plan2').st);
+    $('f3').textContent=stTxt(rev1('plan3').st);
+    return;
+  }
   const r=S.req;
   $('fPeople').textContent=r.confirmed?'18人':'待确认';
   $('fArrive').textContent=r.confirmed?'周六14:30 泉州站':'待确认';
@@ -845,18 +856,27 @@ function r1(){
     <span class="cb">${t.done?'✓':''}</span><span class="tx">${t.txt}</span><span class="own">${t.own}</span></div>`).join('');
   document.querySelector('#prog i').style.width=(done/S.tasks.length*100)+'%';
   $('revs').innerHTML=`
-   <div class="rev open"><div class="h" onclick="togRev('req')">需求确认表（4号）<span class="sp"></span>${reqTagOf()}<span class="arr" id="arr_req">${REV_OPEN.req===false?'▸':'▾'}</span></div>
-     <div class="rbody">${S.req.confirmed?`<div style="font-size:.8rem;color:#33475d;line-height:1.9;margin-top:.45rem">
+   <div class="rev ${REV_OPEN.req?'open':''}" id="rev_req"><div class="h" onclick="togRev('req')">需求确认表（4号）<span class="sp"></span>${reqTagOf()}<span class="arr" id="arr_req">${REV_OPEN.req?'▾':'▸'}</span></div>
+     <div class="rbody"><div style="font-size:.8rem;color:#33475d;line-height:1.9;margin-top:.45rem">
        <div>· 团队共 18 人，包括 15 名球员、3 名工作人员；</div>
        <div>· 计划周六 14:30 左右抵达泉州站（需接站）；</div>
        <div>· 周六晚训练、周日上午友谊赛，最终活动时间和场地待组织方确认；</div>
        <div>· 领队稍后发送人员名单；</div>
        <div>· 饮食方面，两名球员对花生过敏，一名工作人员不食牛肉；</div>
        <div>· 球队希望了解福建侨乡历史、体验传统音乐和地方艺术，并愿意参加文化交流及合影。</div>
-       <div style="font-size:.72rem;color:var(--dim);margin-top:.3rem">同步码 ${S.req.code||'—'} · 两轮英语问询已确认</div>
-       ${reqBtns()}</div>`:'<div style="font-size:.76rem;color:var(--dim);margin-top:.3rem">等待 4号 完成英语问询并生成需求确认表。</div>'}</div></div>
+       ${rev1('req').st==='approved'
+         ? `<div style="font-size:.72rem;color:#1f7a4d;margin-top:.35rem">✓ 1号 已审核通过 · 作为全组执行依据</div>
+            <button class="btn ghost" style="width:100%;margin-top:.4rem;padding:.45rem;font-size:.8rem" onclick="openReqDoc(true)">📄 查看已通过的需求确认表</button>`
+         : `${rev1('req').st==='returned'&&rev1('req').note?`<div style="font-size:.76rem;color:#b6432a;margin-top:.3rem">退回意见：${rev1('req').note}</div>`:''}
+            <button class="btn gold" style="width:100%;margin-top:.5rem;padding:.55rem" onclick="openReqDoc(true)">📄 打开完整需求确认表（阅读后审核）</button>
+            <input class="note" id="note_req" placeholder="退回意见（仅退回时必填）">
+            <div class="acts"><button class="btn gold" onclick="reviewReq(true)">✓ 通过</button>
+            <button class="btn ghost" onclick="reviewReq(false)">✕ 退回</button></div>
+            <div style="font-size:.72rem;color:var(--dim);margin-top:.3rem">1号台存档审核 · 不影响 2 / 3 / 4 号台</div>`}
+     </div></div></div>
    ${revBlock('plan2','文化体验方案','s2')}
    ${revBlock('plan3','接待行程方案','s3')}`;
+
   /* 全组动态：四个机位进度条（随任务清单勾选实时跟进） */
   const DCOLOR={'1':'#6f9ce0','2':'#64c795','3':'#d0a557','4':'#b18ae0'};
   $('teamBars').innerHTML=['1','2','3','4'].map(n=>{
@@ -903,17 +923,17 @@ function renderSopInto(){
 }
 function sopOverview(){
   const steps=[
-    ['需求确认 · 4号 外联英语台',reqSt()==='approved'],
-    ['方案设计 · 2号 文化 / 3号 行程',S.plan2.status==='approved'&&S.plan3.status==='approved'],
+    ['需求确认 · 4号 外联英语台',rev1('req').st==='approved'],
+    ['方案设计 · 2号 文化 / 3号 行程',rev1('plan2').st==='approved'&&rev1('plan3').st==='approved'],
     ['统筹审核 · 1号 统筹台',sopReady()],
     ['SOP 交底 · 1号 → 全组',!!(S.sop&&S.sop.done)],
     ['现场执行 · 变更处置 · 复盘',!!(S.sop&&S.sop.done)]
   ];
   const cur=steps.findIndex(s=>!s[1]);
   const flow=`<div class="sopFlow">${steps.map((s,i)=>`<div class="sopStep ${s[1]?'ok':''}"><span class="n">${s[1]?'✓':i+1}</span><span style="${i===cur?'color:var(--gold);font-weight:700':''}">${s[0]}</span></div>`).join('')}</div>`;
-  const g=S.plan2,p=S.plan3;
-  const picks=g.picks.map(id=>{const pr=PROJECTS.find(q=>q.id===id);return pr?pr.n:id});
-  const gsum=Object.values(g.giftList).reduce((a,b)=>a+b,0);
+  const g=plan2Src(),p=plan3Src();
+  const picks=(g.picks||[]).map(id=>{const pr=PROJECTS.find(q=>q.id===id);return pr?pr.n:id});
+  const gsum=Object.values(g.giftList||{}).reduce((a,b)=>a+b,0);
   const cars=(p.cars||[]).filter(c=>c.conf).length;
   const sum=`<div style="margin-top:.7rem;font-size:.8rem;color:#33475d;line-height:1.85">
     <div>· 4号：需求确认表已通过（同步码 ${S.req.code||'—'}）</div>
@@ -993,19 +1013,19 @@ function sopDocHTML(){
     <div class="sec">五、变更与风险应对</div>
     ${riskRows}
     <div class="sec">六、审核与归档</div>
-    <div class="enNote">需求确认表：${reqTagOf().includes('已通过')?'已通过':'待通过'} · 文化体验方案：已通过 · 接待行程方案：已通过 · 同步码 ${r.code||'—'}</div>
+    <div class="enNote">需求确认表：${rev1('req').st==='approved'?'已通过':'待通过'} · 文化体验方案：已通过 · 接待行程方案：已通过 · 同步码 ${r.code||'—'}</div>
     <div class="enNote">交底状态：${S.sop&&S.sop.done?'已交底全组 · '+S.sop.at:'待交底（点「确认交底 · 归档」）'}</div>
     <div class="sign"><span>汇总：学生1</span><span>交底：全组四机位</span><span>${new Date().toLocaleDateString('zh-CN')}</span></div>
   </div>`;
 }
 let sopNotified=false;
-function sopReady(){return S.req.confirmed&&(S.req.status||'submitted')==='approved'&&S.plan2.status==='approved'&&S.plan3.status==='approved'}
+function sopReady(){return rev1('req').st==='approved'&&rev1('plan2').st==='approved'&&rev1('plan3').st==='approved'}
 function sopSummary(){
-  const g=S.plan2,p=S.plan3;
-  const picks=g.picks.map(id=>{const pr=PROJECTS.find(q=>q.id===id);return pr?pr.n:id});
-  const enOk=g.picks.filter(id=>{const d=g.details[id];return d&&d.en&&d.en.trim()&&!d.en.startsWith('⏳')}).length;
-  const gifts=GIFTS.filter(x=>g.giftList[x.id]).map(x=>x.n+'×'+g.giftList[x.id]);
-  const gsum=Object.values(g.giftList).reduce((a,b)=>a+b,0);
+  const g=plan2Src(),p=plan3Src();
+  const picks=(g.picks||[]).map(id=>{const pr=PROJECTS.find(q=>q.id===id);return pr?pr.n:id});
+  const enOk=(g.picks||[]).filter(id=>{const d=(g.details||{})[id];return d&&d.en&&d.en.trim()&&!d.en.startsWith('⏳')}).length;
+  const gifts=GIFTS.filter(x=>(g.giftList||{})[x.id]).map(x=>x.n+'×'+g.giftList[x.id]);
+  const gsum=Object.values(g.giftList||{}).reduce((a,b)=>a+b,0);
   const days=p.rows?p.rows.filter(x=>x.d).length:0, acts=p.rows?p.rows.filter(x=>!x.d).length:0;
   const cars=p.cars||[],cok=cars.filter(c=>c.conf).length, cnames=cars.filter(c=>c.conf).map(c=>c.type+(c.qty?'×'+c.qty:'')).join('、')||'（待确认）';
   const notes=(p.notes||[]).length;
@@ -1015,7 +1035,7 @@ function sopSummary(){
     `两轮英语对接完成：首轮问询${S.call.replied.A?' ✓':' ✗'} · 行程核对${S.call.replied.B?' ✓':' ✗'}；`+
     `《来访球队需求确认表》已通过 1号 审核（同步码 ${S.req.code||'—'}）：18人（15+3）· 周六 14:30 泉州站（需接站）· 2人花生过敏 · 1人不食牛肉 · 文化偏好：侨乡历史 / 传统音乐 / 地方艺术。`);
   h+=sec('2号 · 文化方案台（体验设计）',
-    `《文化体验方案》已通过 1号 审核：${g.picks.length} 个体验环节（${picks.join('、')||'—'}）· 双语物料 ${enOk}/${g.picks.length} 生成 · 中英双语说明书 ×${g.cardNum||'—'} · 伴手礼 ${Object.keys(g.giftList).length} 类共 ${gsum} 份（${gifts.join('、')||'—'}）${g.flagEx?' · 含队旗交换':''}${g.photo?' · 含合影授权':''}。`);
+    `《文化体验方案》已通过 1号 审核：${(g.picks||[]).length} 个体验环节（${picks.join('、')||'—'}）· 双语物料 ${enOk}/${(g.picks||[]).length} 生成 · 中英双语说明书 ×${g.cardNum||'—'} · 伴手礼 ${Object.keys(g.giftList||{}).length} 类共 ${gsum} 份（${gifts.join('、')||'—'}）${g.flagEx?' · 含队旗交换':''}${g.photo?' · 含合影授权':''}。`);
   h+=sec('3号 · 行程安排台（落地执行）',
     `《接待行程与岗位责任表》已通过 1号 审核：行程 ${days} 天 · ${acts} 项事项（含责任岗到人）· 车辆 ${cok}/${cars.length} 确认到位（${cnames}）· 注意事项 ${notes} 项（避敏餐、时间待定项已标注）。`);
   h+=sec('1号 · 统筹审核结论',
@@ -1031,48 +1051,36 @@ function togRev(key){
   const a=$('arr_'+key); if(a)a.textContent=REV_OPEN[key]?'▾':'▸';
 }
 function revBlock(key,name,part){
-  const o=S[key];
-  let html=`<div class="rev ${REV_OPEN[key]?'open':''}" id="rev_${key}"><div class="h" onclick="togRev('${key}')">${name}（${key==='plan2'?'2号':'3号'}）<span class="sp"></span>${tagOf(o.status)}<span class="arr" id="arr_${key}">${REV_OPEN[key]?'▾':'▸'}</span></div><div class="rbody">`;
-  if(key==='plan2'){
-    if(o.status==='submitted'){
-      html+=`<button class="btn gold" style="width:100%;margin-top:.5rem;padding:.55rem" onclick="openDocReview()">📄 打开完整方案（阅读后审核）</button>`;
-    }else if(o.status==='returned'&&o.note){
-      html+=`<div style="font-size:.76rem;color:#b6432a;margin-top:.35rem">退回意见：${o.note}</div>
-        <div style="font-size:.72rem;color:var(--dim);margin-top:.25rem">2号修改后会重新提交，届时可再次审阅。</div>`;
-    }else if(o.status==='approved'){
-      html+=`<div style="font-size:.76rem;color:#1f7a4d;margin-top:.35rem">已审核通过，2号将与对方确认最终版。</div>
-        <button class="btn ghost" style="width:100%;margin-top:.4rem;padding:.4rem;font-size:.78rem" onclick="openDocReview()">📄 查看已通过方案</button>`;
-    }else{
-      html+=`<div style="font-size:.76rem;color:var(--dim);margin-top:.3rem">等待 2号 编排并提交方案书。</div>`;
-    }
+  const which=key==='plan2'?'2号':'3号';
+  const o=rev1(key);
+  const openFn=key==='plan2'?'openDocReview()':'openDocReview3()';
+  const docName=key==='plan2'?'完整方案':'完整行程方案';
+  let html=`<div class="rev ${REV_OPEN[key]?'open':''}" id="rev_${key}"><div class="h" onclick="togRev('${key}')">${name}（${which}）<span class="sp"></span>${tagOfSt(o.st)}<span class="arr" id="arr_${key}">${REV_OPEN[key]?'▾':'▸'}</span></div><div class="rbody">`;
+  if(o.st==='approved'){
+    html+=`<div style="font-size:.76rem;color:#1f7a4d;margin-top:.35rem">✓ 1号 已审核通过，全组按此执行。</div>
+      <button class="btn ghost" style="width:100%;margin-top:.4rem;padding:.42rem;font-size:.78rem" onclick="${openFn}">📄 查看已通过${docName}</button>`;
     return html+'</div></div>';
   }
-  if(o.status==='submitted'){
-    html+=`<button class="btn gold" style="width:100%;margin-top:.5rem;padding:.55rem" onclick="openDocReview3()">📄 打开完整行程方案（阅读后审核）</button>
-      <input class="note" id="note_${key}" placeholder="退回意见（仅退回时必填）">
-      <div class="acts"><button class="btn gold" onclick="review('${key}',true)">✓ 通过</button>
-      <button class="btn ghost" onclick="review('${key}',false)">✕ 退回</button></div>`;
-  }else if(o.status==='returned'&&o.note){
+  if(o.st==='returned'&&o.note){
     html+=`<div style="font-size:.76rem;color:#b6432a;margin-top:.35rem">退回意见：${o.note}</div>`;
-  }else if(o.status==='approved'){
-    html+=`<div style="font-size:.76rem;color:#1f7a4d;margin-top:.35rem">已审核通过，可与对方确认最终版。</div>
-      <button class="btn ghost" style="width:100%;margin-top:.4rem;padding:.4rem;font-size:.78rem" onclick="openDocReview3()">📄 查看已通过行程方案</button>`;
-  }else{
-    html+=`<div style="font-size:.76rem;color:var(--dim);margin-top:.3rem">等待 3号 编制并提交行程方案。</div>`;
   }
+  html+=`<button class="btn gold" style="width:100%;margin-top:.5rem;padding:.55rem" onclick="${openFn}">📄 打开${docName}（阅读后审核）</button>
+    <input class="note" id="note_${key}" placeholder="退回意见（仅退回时必填）">
+    <div class="acts"><button class="btn gold" onclick="review('${key}',true)">✓ 通过</button>
+    <button class="btn ghost" onclick="review('${key}',false)">✕ 退回</button></div>`;
   return html+'</div></div>';
 }
 function openDocReview3(){
-  const p=S.plan3;
-  $('mTitle').textContent='《接待行程与岗位责任表》· '+tagText(p.status);
-  $('mBody').innerHTML=docHTML3();
-  if(p.status==='submitted'){
+  const src=plan3Src(), st=rev1('plan3').st;
+  $('mTitle').textContent='《接待行程与岗位责任表》· '+(st==='approved'?'已通过':st==='returned'?'已退回':'待审核');
+  $('mBody').innerHTML=docHTML3(src);
+  if(st==='approved'){
+    $('mFoot').innerHTML=`<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">关闭</button>`;
+  }else{
     $('mFoot').innerHTML=`<span id="readTip3" style="font-size:.74rem;color:#b6432a">⬇ 请滚动阅读完整行程方案后进行审核</span>
       <input class="note" id="note_plan3" placeholder="退回意见（退回时必填）">
       <button class="btn gold" id="docOk3" disabled onclick="review('plan3',true)">✓ 通过</button>
       <button class="btn ghost" id="docNo3" disabled onclick="review('plan3',false)">✕ 退回</button>`;
-  }else{
-    $('mFoot').innerHTML=`<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">关闭</button>`;
   }
   openModal();
   const b=$('mBody');
@@ -1084,28 +1092,9 @@ function openDocReview3(){
   b.onscroll=chk; requestAnimationFrame(()=>{b.scrollTop=0;chk()});
 }
 /* ---------- 4号《来访球队需求确认表》生成 / 查看 / 审核 ---------- */
-function reqSt(){return S.req.confirmed?(S.req.status||'submitted'):''}
-function reqTagOf(){
-  const st=reqSt();
-  return !st?`<span class="tag red" style="cursor:pointer" title="点击直接确认需求" onclick="quickConfirmReq()">待确认 · 点击确认</span>`
-    :st==='approved'?'<span class="tag green">已通过</span>'
-    :st==='returned'?'<span class="tag red">已退回</span>'
-    :'<span class="tag blue">待审核</span>';
-}
-function quickConfirmReq(){
-  if(!S.req.confirmed){
-    S.req.confirmed=true;
-    S.req.data={culture:['侨乡历史','传统音乐','地方艺术']};
-    if(!S.req.code)S.req.code=String(Math.floor(1000+Math.random()*9000));
-    S.tasks.find(t=>t.id==='t3').done=true;
-    notify(`1号：需求信息确认无误，《来访球队需求确认表》已生成（同步码 ${S.req.code}）。`);
-  }else{
-    notify('1号：已确认《来访球队需求确认表》。');
-  }
-  S.req.status='approved';S.req.note='';
-  push('s4');push('s1');r1();renderFoot();
-  toast('需求确认表已确认');
-}
+function reqSt(){return rev1('req').st}
+function reqTagOf(){ return tagOfSt(rev1('req').st) }
+function quickConfirmReq(){ reviewReq(true) }
 function reqBtns(){
   const st=reqSt();
   if(st==='approved'){
@@ -1121,17 +1110,17 @@ function reqBtns(){
 }
 function reviewReq(ok){
   if(ok){
-    S.req.status='approved';S.req.note='';
-    notify('1号：已审核通过《来访球队需求确认表》。');
-    toast('已通过需求确认表');
+    rev1Set('req','approved');
+    S.tasks.find(t=>t.id==='t2').done=true;
+    S.tasks.find(t=>t.id==='t3').done=true;
+    toast('1号：已通过需求确认表');
   }else{
     const box=$('note_req'); const note=(box&&box.value.trim())||'请补充确认信息细节';
-    S.req.status='returned';S.req.note=note;
-    notify(`1号：《来访球队需求确认表》被退回 —— ${note}`);
-    toast('已退回需求确认表');
+    rev1Set('req','returned',note);
+    toast('1号：已退回需求确认表');
   }
   closeModal();
-  push('s4'); r1(); renderFoot();
+  pushS1(); r1(); renderFoot();
 }
 function reqDocHTML(){
   const r=S.req, d=r.data||{};
@@ -1167,11 +1156,10 @@ function reqDocHTML(){
   </div>`;
 }
 function openReqDoc(forReview){
-  if(!S.req.confirmed){toast('4号尚未同步需求确认表');return}
   const st=reqSt();
-  $('mTitle').textContent='《来访球队需求确认表》· '+tagText(st);
+  $('mTitle').textContent='《来访球队需求确认表》· '+(st==='approved'?'已通过':st==='returned'?'已退回':'待审核');
   $('mBody').innerHTML=reqDocHTML();
-  if(forReview&&st==='submitted'){
+  if(forReview&&st!=='approved'){
     $('mFoot').innerHTML=`<span id="readTipR" style="font-size:.74rem;color:#b6432a">⬇ 请滚动阅读完整需求确认表后进行审核</span>
       <input class="note" id="note_req" placeholder="退回意见（退回时必填）">
       <button class="btn gold" id="docOkR" disabled onclick="reviewReq(true)">✓ 通过</button>
@@ -1190,16 +1178,16 @@ function openReqDoc(forReview){
 }
 let docScrollBound=false;
 function openDocReview(){
-  const g=S.plan2;
-  $('mTitle').textContent='《文化体验方案》· '+tagText(g.status);
-  $('mBody').innerHTML=docHTML();
-  if(g.status==='submitted'){
+  const src=plan2Src(), st=rev1('plan2').st;
+  $('mTitle').textContent='《文化体验方案》· '+(st==='approved'?'已通过':st==='returned'?'已退回':'待审核');
+  $('mBody').innerHTML=docHTML(src);
+  if(st==='approved'){
+    $('mFoot').innerHTML=`<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">关闭</button>`;
+  }else{
     $('mFoot').innerHTML=`<span id="readTip" style="font-size:.74rem;color:#b6432a">⬇ 请滚动阅读完整方案后进行审核</span>
       <input class="note" id="note_plan2" placeholder="退回意见（退回时必填）">
       <button class="btn gold" id="docOk" disabled onclick="review('plan2',true)">✓ 通过</button>
       <button class="btn ghost" id="docNo" disabled onclick="review('plan2',false)">✕ 退回</button>`;
-  }else{
-    $('mFoot').innerHTML=`<span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">关闭</button>`;
   }
   openModal();
   const b=$('mBody');
@@ -1211,20 +1199,30 @@ function openDocReview(){
   b.onscroll=chk; requestAnimationFrame(()=>{b.scrollTop=0;chk()});
 }
 function tagText(st){return st==='draft'?'编制中':st==='submitted'?'待审阅':st==='approved'?'已通过':'已退回'}
+/* 1号台本地审核记录：只存在 1号台自己的分区，不同步给 2/3/4 号台 */
+function rev1(k){
+  if(!S.rev1)S.rev1={};
+  if(!S.rev1[k])S.rev1[k]={st:'submitted',note:''};
+  return S.rev1[k];
+}
+function rev1Set(k,st,note){ if(!S.rev1)S.rev1={}; S.rev1[k]={st:st,note:note||''}; }
+let pushS1t=null;
+function pushS1(){ clearTimeout(pushS1t); pushS1t=setTimeout(()=>push('s1'),500); }
+function tagOfSt(st){ return st==='approved'?'<span class="tag green">已通过</span>':st==='returned'?'<span class="tag red">已退回</span>':'<span class="tag blue">待审核</span>' }
 function tagOf(s){return s==='draft'?'<span class="tag">编制中</span>':s==='submitted'?'<span class="tag blue">待审核</span>':s==='approved'?'<span class="tag green">已通过</span>':'<span class="tag red">已退回</span>'}
 function tgl(id){const t=S.tasks.find(x=>x.id===id);t.done=!t.done;push('s1');r1();renderFoot();}
 function review(key,ok){
   const nm=key==='plan2'?'文化体验方案':'接待行程方案';
   if(ok){
-    S[key].status='approved';S[key].note='';
+    rev1Set(key,'approved');
     S.tasks.find(t=>t.id===(key==='plan2'?'t6':'t7')).done=true;
-    notify(`1号：已审核通过${nm}。`); push(key==='plan2'?'s2':'s3'); push('s1'); toast('已通过'+nm);
+    toast('1号：已通过'+nm);
   }else{
     const box=$('note_'+key); const note=(box&&box.value.trim())||'请补充活动时长与人员分工细节';
-    S[key].status='returned';S[key].note=note;
-    notify(`1号：${nm}被退回 —— ${note}`); push(key==='plan2'?'s2':'s3'); toast('已退回'+nm);
+    rev1Set(key,'returned',note);
+    toast('1号：已退回'+nm);
   }
-  r1();renderFoot();
+  pushS1(); closeModal(); r1(); renderFoot();
 }
 
 /* ==================================================== 2号 ==================================================== */
@@ -1315,6 +1313,71 @@ const EN_TPL={
  p15:'You will enjoy Nanyin music and Liyuan Opera on one stage, like an old Quanzhou people — with a cup of tea while watching the show.',
  p16:'Runbing is the spring roll of Quanzhou. An amah will teach you how to roll it yourself, and you can eat what you make!'
 };
+/* ---------- 1号台内置审核稿：2/3 号未提交前，1号 也可直接打开审核 ---------- */
+const DEMO2={
+  picks:['p1','p2','p3'],
+  details:{
+    p1:{slot:'周日 14:30 · 赛事与午休后',join:'全体队员参与',loc:'侨批文化馆',en:EN_TPL.p1},
+    p2:{slot:'周日 15:20 · 弹性时段',join:'分两组轮换',loc:'南音艺坊',en:EN_TPL.p2},
+    p3:{slot:'周日 16:20 · 弹性时段',join:'自愿报名',loc:'木偶剧场',en:EN_TPL.p3}
+  },
+  cardNum:'18',
+  giftList:{dishui:18,huazhuan:18,citong:18},
+  flagEx:true, photo:true, status:'draft'
+};
+const DEMO3={
+  info:{
+    arrive:'周六 14:30 · 泉州站（需接站）',
+    team:'共 18 人（15 名球员 + 3 名工作人员）',
+    match:'周六晚训练 · 周日上午友谊赛（时间与场地待组织方确认）',
+    hotel:'泉州迎宾馆 · 15 标间 + 2 单间',
+    diet:'花生过敏 ×2 · 不食牛肉 ×1',
+    list:'领队稍后发送人员名单',
+    pref:'侨乡历史 / 传统音乐 / 地方艺术',
+    other:'愿意参加文化交流与合影（拍摄前征得同意）'
+  },
+  rows:[
+    {d:'周六下午 · 接站入住'},
+    {t:'14:00',txt:'车辆抵达泉州站西广场，接站牌就位，司机待命',own:'3号 + 司机'},
+    {t:'14:30',txt:'球队抵达，清点人员与行李（大件行李 18 件）',own:'3号'},
+    {t:'15:10',txt:'发车前往酒店，车程约 25 分钟',own:'3号'},
+    {t:'15:40',txt:'办理入住，分发房卡、行程卡与伴手礼',own:'3号 + 4号'},
+    {t:'17:30',txt:'晚餐（过敏与忌口专桌，出餐前核对配料）',own:'3号'},
+    {d:'周六晚 · 赛事训练保障'},
+    {t:'19:00',txt:'前往训练场地，赛前训练 90 分钟；训练后直接返程休息，不叠加活动',own:'3号',pending:true},
+    {d:'周日上午 · 友谊交流'},
+    {t:'08:00',txt:'早餐后发车前往比赛场地',own:'3号'},
+    {t:'09:30',txt:'友谊赛（上午场，时间与场地待组织方确认）',own:'3号 + 教练',pending:true},
+    {t:'12:00',txt:'午餐与午休，不安排其他活动，保障体力恢复',own:'3号'},
+    {d:'周日下午 · 弹性文化体验'},
+    {t:'14:30',txt:'文化体验：侨批馆 / 南音赏析 / 提线木偶（视赛事结束时间与球队状态启用）',own:'2号 + 4号',flex:true},
+    {t:'16:30',txt:'合影与队旗交换（拍摄前征得同意）',own:'4号',flex:true},
+    {d:'周一 · 离泉送行'},
+    {t:'09:30',txt:'退房、行李装车，逐项清点物品',own:'3号'},
+    {t:'10:00',txt:'送往泉州站，协助进站与行李托运',own:'3号'},
+    {t:'10:40',txt:'球队离泉，接待任务结束',own:'3号'}
+  ],
+  cars:[
+    {type:'33座旅游大巴',qty:'1',plate:'闽C·B8821',driver:'陈师傅',phone:'139 0506 8871',use:'接站 + 两日全程（行李舱充足）',conf:true},
+    {type:'商务车（应急备用）',qty:'1',plate:'闽C·D3390',driver:'林师傅',phone:'138 6077 2210',use:'应急送医 / 分批转运',conf:true}
+  ],
+  notes:[
+    {txt:'2名球员花生过敏：全桌无花生、餐具分开、出餐前核对配料',done:true},
+    {txt:'1名工作人员不食牛肉：单独餐标（鸡/海鲜替代）',done:true},
+    {txt:'每餐前现场核对菜单并留存照片',done:true},
+    {txt:'友谊赛时间与场地待组织方确认，确认后同步全组',done:false},
+    {txt:'文化活动不与训练、比赛与必要休息冲突，预留机动时间',done:true},
+    {txt:'发车前10分钟车辆到位，司机与3号点对点联络',done:true}
+  ],
+  status:'draft'
+};
+function plan2Src(){ return (S.plan2.picks&&S.plan2.picks.length)?S.plan2:DEMO2 }
+function plan3Src(){
+  const p=S.plan3;
+  const real=(p.rows||[]).filter(x=>!x.d&&x.txt&&x.txt.trim()&&!x.txt.trim().startsWith('（'));
+  return real.length?p:DEMO3;
+}
+
 /* ---------- 2号方案预置成稿（主题：寻根刺桐，艺见泉州） ---------- */
 let _p2init=false;
 function initPlan2(){
@@ -1507,19 +1570,22 @@ function genDoc(){
   notify('2号：已完成方案编排，生成《文化体验方案》正式稿。');
   push('s2');render2Steps();toast('方案书已生成，本页完整展示，确认后可提交');
 }
-function giftTable(){
-  const rows=GIFTS.filter(x=>S.plan2.giftList[x.id]).map(x=>`<tr><td>${x.ic} ${x.n}</td><td>${x.en}</td><td style="text-align:center"><b>×${S.plan2.giftList[x.id]}</b></td></tr>`).join('');
+function giftTable(src){
+  const g=src||S.plan2;
+  const rows=GIFTS.filter(x=>(g.giftList||{})[x.id]).map(x=>`<tr><td>${x.ic} ${x.n}</td><td>${x.en}</td><td style="text-align:center"><b>×${g.giftList[x.id]}</b></td></tr>`).join('');
   return rows||'<tr><td colspan="3">（未选择伴手礼）</td></tr>';
 }
-function docHTML(){
-  const g=S.plan2, ps=g.picks.map(id=>({p:PROJECTS.find(q=>q.id===id),d:det(id)}));
+function docHTML(src){
+  const g=src||S.plan2;
+  const dd=id=>((g.details&&g.details[id])||{slot:SLOTS[0],join:JOINS[0],loc:((PROJECTS.find(q=>q.id===id)||{}).loc||'待定'),en:EN_TPL[id]||''});
+  const ps=g.picks.map(id=>({p:PROJECTS.find(q=>q.id===id),d:dd(id)})).filter(o=>o.p);
   const r=S.req;
   const visit=r.confirmed?
     `18人（15名队员 + 3名工作人员）· 偏好：${(r.data.culture||[]).join(' / ')||'—'}`:
     '（待 4号 需求确认表同步后自动填充）';
   const enApp=ps.map((o,i)=>`<div class="enNote"><b>环节${['一','二','三'][i]} EN：</b>${(o.d.en||'（未填写）').replace(/</g,'&lt;')}</div>`).join('');
   const cnum=g.cardNum||'＿＿';
-  const gsum=Object.values(g.giftList).reduce((a,b)=>a+b,0);
+  const gsum=Object.values(g.giftList||{}).reduce((a,b)=>a+b,0);
   return `<div class="docWrap">
     <h4>「寻根刺桐，艺见泉州」</h4>
     <div class="dsub">—— 海外闽籍青年球队来访文化体验方案 ——</div>
@@ -1534,7 +1600,7 @@ function docHTML(){
     <div>配套<b>中英双语说明手册 ×${cnum}</b>：采用简洁通俗的表达，向球队队员讲解泉州文化背景以及各项目体验流程；手册重点针对<b>南音、提线木偶戏</b>两项非遗进行基础科普，便于队员理解非遗特色、掌握参与互动的步骤。每份含全环节中文介绍、英文欢迎语对照与关键词词汇表，各环节英文欢迎语（AI 辅助生成、2号人工校对）附录如下：</div>
     ${enApp}
     <div class="sec">四、伴手礼清单（合计 ${gsum||'__'} 份）</div>
-    <table><tr><th style="width:34%">品名</th><th>英文对照</th><th style="width:14%">数量</th></tr>${giftTable()}</table>
+    <table><tr><th style="width:34%">品名</th><th>英文对照</th><th style="width:14%">数量</th></tr>${giftTable(g)}</table>
     <div style="font-size:.76rem;color:#6b6257;margin-top:.2rem">同时为参赛球队定制专属特色球衣（运动速干透气科技面料，透气排汗、干爽抗皱，彰显泉州轻工产业制造实力）；泉州主题文创伴手礼套装含滴水兽文创摆件、闽南花砖杯垫、刺桐主题明信片。伴手礼的品类、数量将按照最终实际团队人数核对统计，建立完整物资交接清单，落实清点、登记与发放全流程管理（随行说明书中附中英双语领取指引）。</div>
     <div class="sec">五、礼仪与授权事项</div>
     <div>${g.flagEx?'· 队旗交换：自愿参与，提前与教练确认双方队旗、交换时机与仪式流程。<br>':''}${g.photo?'· 合影与影像使用：拍摄前须征得来访团队明确同意，未同意素材不外传。':'· 影像事项：暂不安排公开影像使用。'}</div>
@@ -1785,8 +1851,8 @@ function genDoc3(){
   notify('3号：已生成《接待行程与岗位责任表》正式稿。');
   push('s3');r3();toast('文件已生成，本页完整展示，确认后可提交');
 }
-function docHTML3(){
-  const p=S.plan3, I=p.info;
+function docHTML3(src){
+  const p=src||S.plan3, I=p.info||{};
   const dayName=i=>{for(let j=i;j>=0;j--)if(p.rows[j].d)return p.rows[j].d;return ''};
   const tlRows=p.rows.map(x=>x.d
     ?`<tr><td colspan="4" style="background:rgba(140,47,36,.08);font-weight:700;color:#8c2f24">📅 ${x.d.replace(/</g,'&lt;')}</td></tr>`
@@ -1800,11 +1866,13 @@ function docHTML3(){
     <div class="dsub">拟制：学生3（行程安排） · 呈报：学生1（统筹审核） · ${new Date().toLocaleDateString('zh-CN')}</div>
     <div class="sec">一、来访信息</div>
     <table>${kvRow('arrive','抵达')}${kvRow('team','人数')}${kvRow('match','赛训')}${kvRow('hotel','住宿')}${kvRow('diet','饮食禁忌')}${kvRow('list','名单')}${kvRow('pref','文化偏好')}${kvRow('other','其他')}</table>
-    <div class="sec">二、行程时间轴（赛事优先 · 休息缓冲）</div>
+    <div class="sec">二、行程编制说明</div>
+    <div>根据已确认的抵达时间与赛事安排，行程划分为<b>接站入住、赛事训练保障、友谊交流、弹性文化体验、离泉送行</b>五个环节：周六下午安排泉州站接站、人员与行李清点、酒店入住；周六晚优先保障训练及返程休息；周日上午优先保障友谊赛。文化活动不与训练、比赛和必要休息冲突，具体安排结合赛事结束时间、球队状态和离泉时间确定，并预留机动时间。</div>
+    <div class="sec">三、行程时间轴（赛事优先 · 休息缓冲）</div>
     <table><tr><th style="width:11%">时间</th><th>事项</th><th style="width:14%">责任岗</th><th style="width:14%">状态</th></tr>${tlRows}</table>
-    <div class="sec">三、车辆核定</div>
+    <div class="sec">四、车辆核定</div>
     <table><tr><th>车型</th><th style="width:9%">数量</th><th style="width:16%">车牌</th><th style="width:20%">司机 / 电话</th><th>用途</th><th style="width:12%">到位</th></tr>${carRows}</table>
-    <div class="sec">四、注意事项清单</div>
+    <div class="sec">五、注意事项清单</div>
     ${noteRows}
     <div class="sign"><span>拟制：学生3</span><span>审核：学生1</span><span>${new Date().toLocaleDateString('zh-CN')}</span></div>
   </div>`;
