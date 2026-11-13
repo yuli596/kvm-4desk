@@ -31,6 +31,9 @@ body{background:radial-gradient(1300px 780px at 72% -12%,#eef4fb 0%,var(--bg) 58
 #bar button{border:1px solid rgba(120,140,165,.35);background:#ffffff;color:var(--text);
   border-radius:.55rem;padding:.42rem .8rem;font-size:.82rem;cursor:pointer;font-family:inherit}
 #bar button:hover{background:#f1f5fa}
+#bar button.rst{border-color:rgba(201,85,61,.45);color:#b6432a;background:rgba(201,85,61,.06)}
+#bar button.rst:hover{background:rgba(201,85,61,.13)}
+#bar button.rst[data-armed="1"]{background:#c9553d;border-color:#c9553d;color:#fff;font-weight:700}
 
 /* ===== 页面容器 ===== */
 .page{flex:1;min-height:0;display:none;padding:.85rem 1.1rem;gap:.85rem}
@@ -131,6 +134,11 @@ body{background:radial-gradient(1300px 780px at 72% -12%,#eef4fb 0%,var(--bg) 58
   box-shadow:0 8px 18px -8px var(--c),inset 0 0 0 2px rgba(255,255,255,.28)}
 #pickGrid .t{font-size:1.82rem;margin-top:1.1rem;font-weight:800;color:#12233b;letter-spacing:.06em}
 #pickGrid .r{font-size:1.06rem;color:#5d7089;margin-top:1rem;padding-top:.95rem;border-top:1px solid #eef1f6;line-height:1.55}
+#pickReset{margin-top:2.1rem;display:flex;align-items:center;gap:.55rem;font-size:.82rem;color:#8fa0b4}
+#pickReset button{border:1px solid rgba(120,140,165,.3);background:rgba(255,255,255,.7);color:#5d7089;
+  border-radius:2rem;padding:.36rem .95rem;font-size:.8rem;cursor:pointer;font-family:inherit;transition:.18s}
+#pickReset button:hover{border-color:#c9553d;color:#b6432a;background:#fff}
+#pickReset button[data-armed="1"]{background:#c9553d;border-color:#c9553d;color:#fff;font-weight:700}
 #pickGrid .go{margin-top:1.5rem;font-size:.95rem;font-weight:800;color:var(--c);letter-spacing:.14em;opacity:.85}
 #v-pick .sign{position:relative;z-index:1;margin-top:3.2rem;font-size:.8rem;letter-spacing:.28em;color:#8f9fb2}
 
@@ -504,6 +512,7 @@ body{background:radial-gradient(1300px 780px at 72% -12%,#eef4fb 0%,var(--bg) 58
         <div class="n">4</div><div class="t">外联英语台</div><div class="r">学生4 · 英语实时对话</div><div class="go">进入机位 →</div>
       </div>
     </div>
+    <div id="pickReset"><span>演示前如需清空上一次的全部操作</span><button id="pickResetBtn" data-armed="0" onclick="askReset(this)">↺ 重置为初始状态</button></div>
   </div>
 </div>
 
@@ -742,7 +751,8 @@ function loadLocal(){
 function saveLocal(){ try{localStorage.setItem(LKEY,JSON.stringify(S))}catch(e){} }
 
 const bc=('BroadcastChannel' in window)?new BroadcastChannel('kvm_recep'):null;
-if(bc)bc.onmessage=e=>{ if(e.data&&e.data.type==='patch'){ Object.assign(S,e.data.data); renderAll(); } };
+if(bc)bc.onmessage=e=>{ if(e.data&&e.data.type==='patch'){ Object.assign(S,e.data.data); renderAll(); }
+  else if(e.data&&e.data.type==='reset'){ applyReset(false); } };
 
 async function netInit(){
   const url='api/state';
@@ -804,8 +814,46 @@ function renderBar(){
     <div id="netTag" class="${NET.on?'':'off'}">${NET.on?'● 局域网实时同步':'● 正在操作'}</div>
     <div id="clk">--:--:--</div>
     <button onclick="pickDesk()">机位</button>
+    <button class="rst" id="resetBtn" data-armed="0" onclick="askReset()" title="清空本次演示的所有操作，回到最初的空白状态">↺ 重置</button>
     <button onclick="toggleFS()">全屏</button>`;
   tickClock();
+}
+/* ---------- 一键重置：把本次演示的操作全部还原到初始状态 ---------- */
+let _rstTimer=null;
+function askReset(el){
+  const btn=(el&&el.nodeType===1)?el:$('resetBtn'); if(!btn)return;
+  if(btn.dataset.armed==='1'){ doReset(); return; }
+  if(!btn.dataset.label)btn.dataset.label=btn.innerHTML;
+  btn.dataset.armed='1'; btn.textContent='⚠ 再点一次确认';
+  clearTimeout(_rstTimer);
+  _rstTimer=setTimeout(()=>{ btn.dataset.armed='0'; btn.innerHTML=btn.dataset.label||'↺ 重置'; },4000);
+}
+function doReset(){
+  applyReset(true);
+  document.querySelectorAll('[data-armed="1"]').forEach(btn=>{
+    btn.dataset.armed='0';
+    if(btn.dataset.label)btn.innerHTML=btn.dataset.label;
+  });
+  clearTimeout(_rstTimer);
+  location.hash='';
+  setTimeout(()=>toast('已重置为初始状态，可重新开始演示'),150);
+}
+function applyReset(broadcast){
+  try{stopPlay()}catch(e){}
+  try{closeModal()}catch(e){}
+  try{closePrompter()}catch(e){}
+  S=JSON.parse(JSON.stringify(DEF));
+  Object.keys(REV_OPEN).forEach(k=>REV_OPEN[k]=false);
+  DESK='1';
+  try{localStorage.removeItem(LKEY)}catch(e){}
+  saveLocal();
+  const v=$('vid');
+  if(v){try{v.pause();v.currentTime=0;v.muted=true;delete v.dataset.vsrc;v.removeAttribute('src');v.load()}catch(e){}}
+  if(broadcast){
+    if(bc)bc.postMessage({type:'reset'});
+    if(NET.on)pushAll();
+  }
+  renderAll();
 }
 function pickDesk(){ location.hash=''; }
 function toggleFS(){ if(!document.fullscreenElement)document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
